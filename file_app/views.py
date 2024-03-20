@@ -5,6 +5,8 @@ from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.viewsets import ViewSet
 
+#convert .dat file into csv and calculate second highest salary and average salary
+
 class FileProcessorViewSet(ViewSet):
     @action(methods=['POST'], detail=False, url_path='file/processor')
     def file_processor(self, request):
