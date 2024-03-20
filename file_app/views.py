@@ -1,11 +1,9 @@
+import os
+import csv
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.decorators import action
-import os
-import csv
 from rest_framework.viewsets import ViewSet
-
-#convert .dat file into csv and calculate second highest salary and average salary
 
 class FileProcessorViewSet(ViewSet):
     @action(methods=['POST'], detail=False, url_path='file/processor')
@@ -19,7 +17,7 @@ class FileProcessorViewSet(ViewSet):
             if not output_dir:
                 return Response({'status': False, 'message': 'Output directory path is missing.'}, status=status.HTTP_400_BAD_REQUEST)
 
-            processed_data = {}
+            processed_data = []
             for filename in os.listdir(input_dir):
                 if filename.endswith(".dat"):
                     with open(os.path.join(input_dir, filename), 'r') as file:
@@ -34,40 +32,29 @@ class FileProcessorViewSet(ViewSet):
                                 allowances = float(data[6])
                                 gross_salary = basic_salary + allowances
 
-                                if first_name not in processed_data:
-                                    processed_data[first_name] = {
-                                        'last_name': last_name,
-                                        'email': email,
-                                        'job_title': job_title,
-                                        'basic_salary': basic_salary,
-                                        'allowances': allowances,
-                                        'gross_salary': gross_salary
-                                    }
-                                else:
-                                    processed_data[first_name]['basic_salary'] += basic_salary
-                                    processed_data[first_name]['allowances'] += allowances
-                                    processed_data[first_name]['gross_salary'] += gross_salary
+                                processed_data.append({
+                                    'first_name': first_name,
+                                    'last_name': last_name,
+                                    'email': email,
+                                    'job_title': job_title,
+                                    'basic_salary': basic_salary,
+                                    'allowances': allowances,
+                                    'gross_salary': gross_salary
+                                })
                             except (ValueError, IndexError) as e:
                                 pass
 
-            # Calculate 2nd highest salary and average salary for each name
-            for first_name, data in processed_data.items():
-                salaries = [data['gross_salary']]
-                unique_salaries = list(set(salaries))
-                unique_salaries.sort(reverse=True)
-                second_highest_salary = unique_salaries[1] if len(unique_salaries) > 1 else 0
-                average_salary = sum(unique_salaries) / len(unique_salaries)
-                data['Second Highest Salary'] = second_highest_salary
-                data['average_salary'] = average_salary
+            # Sort processed_data by gross_salary in descending order
+            sorted_data = sorted(processed_data, key=lambda x: x['gross_salary'], reverse=True)
 
             # Generate output CSV file
             output_file_path = os.path.join(output_dir, 'result.csv')
             with open(output_file_path, 'w', newline='') as output_file:
                 writer = csv.writer(output_file)
                 writer.writerow(['first_name', 'last_name', 'email', 'job_title', 'basic_salary', 'allowances', 'gross_salary'])
-                for first_name, data in processed_data.items():
+                for data in sorted_data:
                     writer.writerow([
-                        first_name,
+                        data['first_name'],
                         data['last_name'],
                         data['email'],
                         data['job_title'],
@@ -77,8 +64,10 @@ class FileProcessorViewSet(ViewSet):
                     ])
 
                 # Write footer values
-                writer.writerow(['Second Highest Salary', max(data['Second Highest Salary'] for data in processed_data.values())])
-                writer.writerow(['average_salary', sum(data['average_salary'] for data in processed_data.values()) / len(processed_data)])
+                second_highest_salary = sorted_data[1]['gross_salary'] if len(sorted_data) > 1 else 0
+                average_salary = sum(data['gross_salary'] for data in sorted_data) / len(sorted_data) if sorted_data else 0
+                writer.writerow(['Second Highest Salary', second_highest_salary])
+                writer.writerow(['average_salary', average_salary])
 
             return Response({"status": True, "message": "File saved successfully"}, status=status.HTTP_200_OK)
 
